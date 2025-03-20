@@ -1,0 +1,40 @@
+
+version: 0.2
+
+phases:
+  install:
+    commands:
+      - echo Installing dependencies...
+      - echo Docker is already included in the build environment.
+  pre_build:
+    commands:
+      - AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query 'Account' --output text)
+      - echo Logging in to Amazon ECR...
+      - aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+      - CODEBUILD_RESOLVED_SOURCE_VERSION="${CODEBUILD_RESOLVED_SOURCE_VERSION:-$IMAGE_TAG}"
+      - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+      - IMAGE_TAG="latest"
+      - IMAGE_URI="$IMAGE_REPO_NAME:$IMAGE_TAG"
+      - DOCKERFILE_PATH="$CODEBUILD_SRC_DIR/application/Dockerfile"
+  build:
+    commands:
+      - echo Build started on `date`
+      - echo Building the Docker image...
+      - pwd
+      - ls -ltr
+      - cd application
+      - docker build -f $DOCKERFILE_PATH -t $IMAGE_REPO_NAME:$IMAGE_TAG .
+      - docker images
+      - docker tag $IMAGE_REPO_NAME:$IMAGE_TAG $IMAGE_REPO_URI:$IMAGE_TAG    
+  post_build:
+    commands:
+      - bash -c "if [ /"$CODEBUILD_BUILD_SUCCEEDING/" == /"0/" ]; then exit 1; fi"
+      - echo Build stage successfully completed on `date`
+      - echo Pushing the Docker image...
+      - docker push $IMAGE_REPO_URI:$IMAGE_TAG
+      - printf '[{"name":"EcsFargateContainer","imageUri":"%s"}]' "$IMAGE_REPO_URI:$IMAGE_TAG" > images.json
+      - pwd
+      - ls -ltr
+      - cat images.json
+artifacts:
+  files: application/images.json
