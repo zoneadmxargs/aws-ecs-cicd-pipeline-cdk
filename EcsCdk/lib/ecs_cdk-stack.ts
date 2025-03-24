@@ -114,9 +114,7 @@ export class EcsCdkStack extends Stack {
       desiredCount: 1,
       assignPublicIp: true, // Ensure public IP is assigned if needed
     });
-
-    // TODO: Add Security Group for External Access
-
+    
     // Output
     new CfnOutput(this, "EcsFargateCodeCommitRepo", {
       description: "CodeCommit Repo Name",
